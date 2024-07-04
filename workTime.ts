@@ -62,11 +62,11 @@ export const promptWithExample = [
 
 const sampleInput = `Gestern habe ich um 7 Uhr angefangen. Dann gabs ne kleine Unterbrechung drei Stunden später für 5 Minuten. 4 Stunden nach der Pause habe ich dann nochmal 30 Minuten Pause gemacht. Um 15 Uhr war dann Feierabend.`
 
-export async function extractWorkTimeInMinutes() {
+export async function extractWorkTimeInMinutes(text: string) {
   const model = new AzureChatOpenAI().bindTools([workdayTool])
   const result = await model.invoke([
     ...promptWithExample,
-    new HumanMessage(sampleInput),
+    new HumanMessage(text),
   ])
   const { start, end, breaks } = result.tool_calls[0].args
   return calculateTotalWorkDayTime(start, end, breaks)
