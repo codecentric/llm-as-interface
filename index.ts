@@ -8,58 +8,50 @@ import {
 import { DynamicStructuredTool } from "@langchain/core/tools"
 import { z } from "zod"
 
-const startTimeTool = new DynamicStructuredTool({
-  name: "startOfWork",
-  description: "Returns only the start time",
+const workdayTool = new DynamicStructuredTool({
+  name: "workDay",
+  description:
+    "Returns start and end time of a work day. Only use once per day.",
   schema: z.object({
-    start: z.number().describe("The start time in 24h format"),
+    start: z.string().describe("The start time"),
+    end: z.string().describe("The time when the work day ended"),
   }),
-  func: async ({ start }) => `Outcome of: ${start})`,
-})
-const endTimeTool = new DynamicStructuredTool({
-  name: "endOfWork",
-  description: "Returns only the end time",
-  schema: z.object({
-    end: z.number().describe("The end time in 24h format"),
-  }),
-  func: async ({ end }) => `Outcome of: ${end})`,
+  func: async () => "",
 })
 const breakTool = new DynamicStructuredTool({
   name: "break",
   description: "Return a break that was done during work",
   schema: z.object({
-    start: z.number().describe("The start time in 24h format"),
-    end: z.number().describe("The end time in 24h format"),
+    start: z.string().describe("The start time in 24h format"),
+    end: z.string().describe("The end time in 24h format"),
   }),
-  func: async ({ end }) => `Outcome of: ${end})`,
+  func: async () => "",
 })
 
 export const promptWithExample = [
-  new SystemMessage(`Deine Aufgabe ist es, die Arbeitszeit zu berechnen. Folge dazu ausschließlich den angegebenen Regeln. Nutze die Tools für die Berechnung. 
-
-## Regeln ##
-Mache alle Berechnungen auf einmal.
-Die Zeit wird im 24h Format angegeben: Zum Beispiel: "20:00".
-`),
+  new SystemMessage(
+    `Deine Aufgabe ist es, die Arbeitszeit zu berechnen. Nutze die Tools für die Berechnung.`,
+  ),
   new HumanMessage(
-    "Ich habe um 9 gestartet und um 10:15 Uhr aufgehört zu arbeiten.",
+    "Ich habe um fünf nach 8 gestartet und dann 3 Stunden gearbeitet. Nach einer halben Stunde Pause habe ich nochmal geschuftet. Um 13 Uhr hatte ich eine Stunde Mittagspause nur um dann nochmal 2h ranzuglotzen.",
   ),
   new AIMessage({
     content: "",
     tool_calls: [
       {
-        name: "startOfWork",
-        args: {
-          start: "09:00",
-        },
+        name: "workDay",
+        args: { start: "8:05", end: "16:00" },
         id: "1",
       },
       {
-        name: "endOfWork",
-        args: {
-          end: "10:15",
-        },
-        id: "1",
+        name: "break",
+        args: { start: "11:05", end: "11:35" },
+        id: "2",
+      },
+      {
+        name: "break",
+        args: { start: "13:00", end: "14:00" },
+        id: "3",
       },
     ],
   }),
@@ -67,13 +59,24 @@ Die Zeit wird im 24h Format angegeben: Zum Beispiel: "20:00".
     tool_call_id: "1",
     content: "",
   }),
+  new ToolMessage({
+    tool_call_id: "2",
+    content: "",
+  }),
+  new ToolMessage({
+    tool_call_id: "3",
+    content: "",
+  }),
+  new AIMessage({
+    content: `Done`,
+  }),
 ]
 
-const sampleInput = `Ich habe um fünf nach 8 gestartet und dann 3 Stunden gearbeitet. Nach einer halben Stunde Pause habe ich nochmal geschuftet. Um 13 Uhr hatte ich eine Stunde Mittagspause nur um dann nochmal 2h ranzuglotzen.`
+const sampleInput = `Gestern habe ich um 7 Uhr angefangen. Dann gabs ne kleine Unterbrechung drei Stunden später für 5 Minuten. Nach 4 Stunden habe ich dann nochmal 30 Minuten Pause gemacht. Um 15 Uhr war dann Feierabend.`
 
 async function main() {
   const model = new AzureChatOpenAI()
-  const llmWithTools = model.bindTools([startTimeTool, endTimeTool, breakTool])
+  const llmWithTools = model.bindTools([workdayTool, breakTool])
   const result = await llmWithTools.invoke([
     ...promptWithExample,
     new HumanMessage(sampleInput),
