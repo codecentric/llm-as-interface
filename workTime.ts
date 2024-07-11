@@ -8,6 +8,16 @@ import {
 import { DynamicStructuredTool } from "@langchain/core/tools"
 import { z } from "zod"
 
+export async function extractWorkTimeInMinutes(text: string): Promise<number> {
+  const model = new AzureChatOpenAI().bindTools([workdayTool])
+  const result = await model.invoke([
+    ...promptWithExample,
+    new HumanMessage(text),
+  ])
+  const { start, end, breaks } = result.tool_calls[0].args
+  return calculateTotalWorkDayTime(start, end, breaks)
+}
+
 const workdayTool = new DynamicStructuredTool({
   name: "workDay",
   description:
@@ -59,18 +69,6 @@ export const promptWithExample = [
     content: `Done`,
   }),
 ]
-
-const sampleInput = `Gestern habe ich um 7 Uhr angefangen. Dann gabs ne kleine Unterbrechung drei Stunden später für 5 Minuten. 4 Stunden nach der Pause habe ich dann nochmal 30 Minuten Pause gemacht. Um 15 Uhr war dann Feierabend.`
-
-export async function extractWorkTimeInMinutes(text: string) {
-  const model = new AzureChatOpenAI().bindTools([workdayTool])
-  const result = await model.invoke([
-    ...promptWithExample,
-    new HumanMessage(text),
-  ])
-  const { start, end, breaks } = result.tool_calls[0].args
-  return calculateTotalWorkDayTime(start, end, breaks)
-}
 
 function calculateTotalWorkDayTime(start, end, breaks) {
   const totalTime = calculateWorkedMinutes(start, end)
